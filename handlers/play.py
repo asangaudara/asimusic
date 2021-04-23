@@ -415,79 +415,50 @@ async def m_cb(b, cb):
             await cb.answer('Chat is not connected!', show_alert=True)
 
 @Client.on_message(command("play") & other_filters)
+@errors
 async def play(_, message: Message):
-    global que
-    lel = await message.reply("🔄 **Processing**")
-    administrators = await get_administrators(message.chat)
-    chid = message.chat.id
-    usar = await USER.get_me()
-    wew = usar.id
-    for administrator in administrators:
-       if administrator == message.from_user.id:  
-               try:
-                   invitelink = await _.export_chat_invite_link(chid)
-               except:
-                   await lel.edit(
-                       "<b>Add me as admin of yor group first</b>",
-                   )
-                   return
 
-               try:
-                   await USER.join_chat(invitelink)
-                   await lel.edit(
-                       "<b> userbot joined your chat</b>",
-                   )
+    lel = await message.reply("🔄 **Processing** sounds...")
+    sender_id = message.from_user.id
+    sender_name = message.from_user.first_name
 
-               except UserAlreadyParticipant:
-                   pass
-               except Exception as e:
-                   #print(e)
-                   #await lel.edit(
-                   #    f"<b>User {user.first_name} couldn't join your group! Make sure user is not banned in group."
-                   #    "\n\nOr manually add @DaisyXmusic to your Group and try again</b>",
-                   #)
-                   pass
-    try:
-        chatdetails = await USER.get_chat(chid)
-        #lmoa = await _.get_chat_member(chid,wew)
-    except:
-        await lel.edit(
-            "<i>helper Userbot not in this chat, Ask admin to send /play command for first time or add assistant manually</i>"
+
+    audio = (message.reply_to_message.audio or message.reply_to_message.voice) if message.reply_to_message else None
+    url = get_url(message)
+
+    if audio:
+        if round(audio.duration / 60) > DURATION_LIMIT:
+            raise DurationLimitError(
+                f"❌ Videos longer than {DURATION_LIMIT} minute(s) aren't allowed to play!"
+            )
+
+        file_name = get_file_name(audio)
+        title = file_name
+        thumb_name = "https://telegra.ph/file/638c20c44ca418c8b2178.jpg"
+        thumbnail = thumb_name
+        duration = round(audio.duration / 60)
+        views = "Locally added"
+      
+        requested_by = message.from_user.first_name
+        await generate_cover(requested_by, title, views, duration, thumbnail)  
+        file_path = await converter.convert(
+            (await message.reply_to_message.download(file_name))
+            if not path.isfile(path.join("downloads", file_name)) else file_name
         )
-        return    
-    sender_id = message.from_user.id
-    sender_name = message.from_user.first_name
-    await lel.edit("🔎 **Finding**")
-    sender_id = message.from_user.id
-    user_id = message.from_user.id
-    sender_name = message.from_user.first_name
-    user_name = message.from_user.first_name
-    rpk = "["+user_name+"](tg://user?id="+str(user_id)+")"
-
-    query = ''
-    for i in message.command[1:]:
-        query += ' ' + str(i)
-    print(query)
-    await lel.edit("🎵 **Processing**")
-    ydl_opts = {"format": "bestaudio[ext=m4a]"}
-    try:
-        results = YoutubeSearch(query, max_results=1).to_dict()
-        url = f"https://youtube.com{results[0]['url_suffix']}"
-        #print(results)
-        title = results[0]["title"][:40]       
-        thumbnail = results[0]["thumbnails"][0]
-        thumb_name = f'thumb{title}.jpg'
-        thumb = requests.get(thumbnail, allow_redirects=True)
-        open(thumb_name, 'wb').write(thumb.content)
-        duration = results[0]["duration"]
-        url_suffix = results[0]["url_suffix"]
-        views = results[0]["views"]
-
-    except Exception as e:
-        await lel.edit("Song not found.Try another song or maybe spell it properly.")
-        print(str(e))
-        return
-
+    elif url:
+        try:
+            results = YoutubeSearch(url, max_results=1).to_dict()
+           # url = f"https://youtube.com{results[0]['url_suffix']}"
+            #print(results)
+            title = results[0]["title"][:40]       
+            thumbnail = results[0]["thumbnails"][0]
+            thumb_name = f'thumb{title}.jpg'
+            thumb = requests.get(thumbnail, allow_redirects=True)
+            open(thumb_name, 'wb').write(thumb.content)
+            duration = results[0]["duration"]
+            url_suffix = results[0]["url_suffix"]
+            views = results[0]["views"]
+       
     keyboard = InlineKeyboardMarkup(
             [   
                 [
@@ -510,38 +481,86 @@ async def play(_, message: Message):
                 ]                             
             ]
         )
-    requested_by = message.from_user.first_name
-    await generate_cover(requested_by, title, views, duration, thumbnail)  
-    file_path = await converter.convert(youtube.download(url))
+        except Exception as e:
+            title = "NaN"
+            thumb_name = "https://telegra.ph/file/638c20c44ca418c8b2178.jpg"
+            duration = "NaN"
+            views = "NaN"
+            keyboard = InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                text="Watch On YouTube",
+                                url=f"https://youtube.com")
+
+                        ]
+                    ]
+                )
+        requested_by = message.from_user.first_name
+        await generate_cover(requested_by, title, views, duration, thumbnail)     
+        file_path = await converter.convert(youtube.download(url))
+    else:
+        await lel.edit("🔎 **Finding** the song...")
+        sender_id = message.from_user.id
+        user_id = message.from_user.id
+        sender_name = message.from_user.first_name
+        user_name = message.from_user.first_name
+        rpk = "["+user_name+"](tg://user?id="+str(user_id)+")"
+
+        query = ''
+        for i in message.command[1:]:
+            query += ' ' + str(i)
+        print(query)
+        await lel.edit("🎵 **Processing** sounds...")
+        ydl_opts = {"format": "bestaudio[ext=m4a]"}
+        try:
+            results = YoutubeSearch(query, max_results=1).to_dict()
+            url = f"https://youtube.com{results[0]['url_suffix']}"
+            #print(results)
+            title = results[0]["title"][:40]       
+            thumbnail = results[0]["thumbnails"][0]
+            thumb_name = f'thumb{title}.jpg'
+            thumb = requests.get(thumbnail, allow_redirects=True)
+            open(thumb_name, 'wb').write(thumb.content)
+            duration = results[0]["duration"]
+            url_suffix = results[0]["url_suffix"]
+            views = results[0]["views"]
+
+        except Exception as e:
+            lel.edit(
+                "❌ Song not found.\n\nTry another song or maybe spell it properly."
+            )
+            print(str(e))
+            return
+
+        keyboard = InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            text="Watch On YouTube",
+                            url=f"{url}")
+
+                    ]
+                ]
+            )
+        requested_by = message.from_user.first_name
+        await generate_cover(requested_by, title, views, duration, thumbnail)  
+        file_path = await converter.convert(youtube.download(url))
   
     if message.chat.id in callsmusic.pytgcalls.active_calls:
         position = await queues.put(message.chat.id, file=file_path)
-        qeue = que.get(message.chat.id)
-        s_name = title
-        r_by = message.from_user
-        loc = file_path
-        appendable = [s_name, r_by, loc]
-        qeue.append(appendable)
         await message.reply_photo(
         photo="final.png", 
-        caption=f"#⃣ Your requested song **queued** at position {position}!",
+        caption=f"#⃣ Your Requested song **Queued** at position {position}!",
         reply_markup=keyboard)
         os.remove("final.png")
         return await lel.delete()
     else:
-        chat_id = message.chat.id
-        que[chat_id] = []
-        qeue = que.get(message.chat.id)
-        s_name = title            
-        r_by = message.from_user
-        loc = file_path
-        appendable = [s_name, r_by, loc]      
-        qeue.append(appendable)
         callsmusic.pytgcalls.join_group_call(message.chat.id, file_path)
         await message.reply_photo(
         photo="final.png",
         reply_markup=keyboard,
-        caption="▶️ **Playing** here the song requested by {} via DaisyXmusic 😜".format(
+        caption="▶️ **Playing** here the song Requested by {}🎵".format(
         message.from_user.mention()
         ),
     )
